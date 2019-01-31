@@ -13,6 +13,12 @@ const tokenOptions = {
   expiresIn: 60 * 5
 }
 
+/**
+ * Check if the data received is a string with at least 11 character.
+ *
+ * @param {Array} data Array with the request data.
+ * @returns true if data is valid | false
+ */
 const dataIsValid = (data) => {
   let valid = true;
   let i = 0;
@@ -25,6 +31,13 @@ const dataIsValid = (data) => {
   return valid;
 }
 
+/**
+ * Generates a JWT based on a username and customer.
+ *
+ * @param {string} username 
+ * @param {string} customer
+ * @returns JWT
+ */
 const generateToken = (username, customer) => {
   const tokenData = {
     username: username,
@@ -34,10 +47,24 @@ const generateToken = (username, customer) => {
   return jwt.sign(tokenData, secret, tokenOptions)
 }
 
+/**
+ * Check if a username is already taken.
+ *
+ * @param {string} username
+ * @returns true if a user already has the same username.
+ */
 const userExists = (username) => {
   return users.some((user) => user.username === username);
 }
 
+/**
+ * Adds a new user to the users array. Also creates an empty Array of books
+ * if the customer is new.
+ *
+ * @param {string} username
+ * @param {string} password
+ * @param {string} customer
+ */
 const createUser = (username, password, customer) => {
   users.push({
     customer: customer,
@@ -51,15 +78,30 @@ const createUser = (username, password, customer) => {
   }
 }
 
+/**
+ * Checks if the username and password match an existing user.
+ *
+ * @param {string} username
+ * @param {string} password
+ * @returns true if the values match | false
+ */
 const login = (username, password) => {
   return users.find((user) => (user.username === username && user.password === password))
 }
 
-const getCustomerByUser = (username) => {
+const getCustomerByUsername = (username) => {
   const user = users.find((user) => user.username === username );
   return user.customer;
 }
 
+/**
+ * Adds a book containing the param data to the customer's books array.
+ * A new ID will be assigned to the book.
+ *
+ * @param {string} customer
+ * @param {Object} book 
+ * @returns The new book.
+ */
 const addBook = (customer, book) => {
   const id = uuid();
   const newBook = {
@@ -70,30 +112,68 @@ const addBook = (customer, book) => {
   return newBook;
 }
 
+/**
+ * Updates the information of a customer's book.
+ *
+ * @param {string} customer
+ * @param {string} bookId
+ * @param {Object} newData New data for the book.
+ * @returns The updated book.
+ */
 const updateBook = (customer, bookId, newData) => {
   const customerBooks = books[customer];
-  const bookIndex = getBookIndexById(customerBooks, bookId)
-  const book = books[customer][bookIndex];
-  const updatedBook = {
-    ...book,
-    ...newData
+  const bookIndex = getBookIndexById(customerBooks, bookId);
+  if (bookIndex !== -1) {
+    const book = books[customer][bookIndex];
+    const updatedBook = {
+      ...book,
+      ...newData
+    }
+    books[customer][bookIndex] = updatedBook;
+    return updatedBook;
   }
-  books[customer][bookIndex] = updatedBook;
-  return updatedBook;
+  else {
+    return null;
+  }
 }
 
+/**
+ * Gets a book from an Array of books based on the book ID.
+ *
+ * @param {Array} customerBooks Array where the book will be searched.
+ * @param {string} bookId
+ * @returns Book data | null
+ */
 const getBookById = (customerBooks, bookId) => {
   return customerBooks.find((book) => book.id === bookId );
 }
 
+/**
+ * Gets the book's array index from an Array of books based on the book ID.
+ *
+ * @param {Array} customerBooks Array where the book will be searched.
+ * @param {string} bookId
+ * @returns if the book is found: Book's array index | -1 
+ */
 const getBookIndexById = (customerBooks, bookId) => {
   return customerBooks.findIndex((book) => book.id === bookId );
 }
 
+/**
+ * Removes a book from the customer's book Array based on the book ID.
+ *
+ * @param {string} customer
+ * @param {string} bookId
+ * @returns true if the book was deleted | false
+ */
 const removeBookById = (customer, bookId) => {
   const customerBooks = books[customer];
   const bookIndex = getBookIndexById(customerBooks, bookId);
-  books[customer].splice(bookIndex, 1);
+  if (bookIndex !== -1) {
+    books[customer].splice(bookIndex, 1);
+    return true;
+  }
+  return false;
 }
 
 const isPublicPath = (path) => {
@@ -131,7 +211,7 @@ app.post('/v2/user', (req, res) => {
       res.status(200);
       res.send();
     } else {
-      res.status(405);
+      res.status(409);
       res.send();
     }
   } 
@@ -149,7 +229,7 @@ app.post('/v2/user/login', (req, res) => {
       res.status(200);
       res.json({
         username: username,
-        customer: getCustomerByUser(username),
+        customer: getCustomerByUsername(username),
         token: generateToken(user.username, user.customer)
       });
     }
@@ -208,18 +288,30 @@ app.route('/v2/book/:id')
     const id = req.params.id;
     const updatedBook = updateBook(legit.customer, id, req.body);
 
-    res.status(200);
-    res.json(updatedBook);
+    if (updatedBook) {
+      res.status(200);
+      res.json(updatedBook);
+    }
+    else {
+      res.status(404);
+      res.send();
+    }
   })
   .delete((req, res) => {
     const token = req.headers['auth-token'];
     const legit = jwt.verify(token, secret, tokenOptions);
     const id = req.params.id;
-    const customer = getCustomerByUser(legit.username);
-    removeBookById(customer, id);
+    const customer = getCustomerByUsername(legit.username);
+    const bookRemoved = removeBookById(customer, id);
 
-    res.status(200);
+    if (bookRemoved) {
+      res.status(200);
+      res.send();
+    } 
+    else {
+      res.status(404);
     res.send();
+    }
   });
 
 app.get('/', (req, res) => {
