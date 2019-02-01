@@ -11,12 +11,18 @@ app.use((req, res, next) => {
   if (commons.isPathPublic(req.path)) {
     next();
   } else {
+    const token = req.headers['auth-token'];
     try {
-      const token = req.headers['auth-token'];
       const tokenData = commons.verifyToken(token, false);
-      req.username = tokenData.username;
-      req.customer = tokenData.customer;
-      next();
+      if (data.isSessionValid(tokenData.username, token)) {
+        req.username = tokenData.username;
+        req.customer = tokenData.customer;
+        next();
+      } 
+      else {
+        res.status(401);
+        res.send();
+      }
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
         const tokenData = commons.verifyToken(token, true);
@@ -90,7 +96,7 @@ app.post('/v2/user/renew', (req, res) => {
 app.get('/v2/user/session', (req, res) => {
   data.removeExpiredTokens(req.username);
   res.status(200);
-  res.json(sessions[req.username]);
+  res.json(data.getUserSessions(req.username));
 });
 
 app.delete('/v2/user/session/:sessionId', (req, res) => {

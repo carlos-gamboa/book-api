@@ -168,6 +168,21 @@ class Data {
     return false;
   }
 
+  /**
+   * Checks if the session hasn't been revoked
+   *
+   * @param {string} username
+   * @param {string} token
+   * @returns true if the session is valid
+   */
+  isSessionValid(username, token) {
+    return this.sessions[username][token] !== undefined;
+  }
+
+  getUserSessions (username) {
+    return this.sessions[username];
+  }
+
   deleteUserSession (username, token) {
     this.sessions[username][token] = undefined;
   }
